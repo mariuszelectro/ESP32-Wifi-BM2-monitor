@@ -7,6 +7,41 @@ The project was designed to monitor the long-term health of a vehicle battery wh
 The primary goal is to detect slow battery discharge when a vehicle remains parked for extended periods.
 
 ---
+# Why This Project Exists
+
+This project was created to solve a very practical problem.
+
+When a vehicle remains parked in a garage for weeks or months, the battery can slowly discharge due to standby loads from the vehicle electronics. If the owner is away from home, it is often impossible to know whether the battery is still healthy or whether charging has become necessary.
+
+The ESP32 WiFi BM2 Monitor allows remote verification of battery condition whenever the vehicle is connected to local WiFi.
+
+Typical usage scenario:
+
+```text
+Vehicle parked in garage
+↓
+Battery monitored automatically
+↓
+Historical voltage trend recorded
+↓
+Owner accesses local web interface remotely
+↓
+Battery status evaluated
+↓
+Battery charger activated if required
+```
+
+The system makes it possible to:
+
+- Monitor long-term battery discharge trends
+- Detect excessive standby battery drain
+- Verify battery condition before returning home
+- Decide when charging is required
+- Avoid deep battery discharge and battery damage
+- Maintain vehicles that are used only occasionally
+
+The focus of the project is not real-time monitoring but long-term observation of battery health with extremely low power consumption.
+
 
 # Features
 

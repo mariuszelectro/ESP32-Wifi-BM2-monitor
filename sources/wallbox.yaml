@@ -1,0 +1,2 @@
+packages:
+  wallbox_recovered: !include wallbox_recovered.yaml

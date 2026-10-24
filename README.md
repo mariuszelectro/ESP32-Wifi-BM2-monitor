@@ -294,7 +294,7 @@ Heartbeat LED:
 Heartbeat LED:
 
 ```text
-fast blinking 50/50 every 300ms
+fast blinking 50/50 every 100ms
 ```
 This allows quick visual identification of device status.
 
@@ -385,11 +385,11 @@ Required voltage divider:
 ```text
 Battery+
  |
-200K
+200K 1% recomended
  |
  +---- GPIO0
  |
-200K
+200K 1% recommeded
  |
 GND
 ```
@@ -421,6 +421,7 @@ Adjust the multiplier according to measurements performed with a calibrated mult
 The XIAO ESP32-C6 battery version exposes battery solder pads on the bottom side of the PCB.
 
 The 18650 cell should be connected directly to these battery pads:
+
 
 ```text
 BAT+

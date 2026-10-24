@@ -289,6 +289,13 @@ Heartbeat LED:
 30 ms pulse every 2 seconds
 ```
 
+### Setup Mode
+
+Heartbeat LED:
+
+```text
+fast blinking 50/50 every 300ms
+```
 This allows quick visual identification of device status.
 
 ---

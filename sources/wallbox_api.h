@@ -8,6 +8,8 @@
 #include <freertos/semphr.h>
 #include <driver/gpio.h>
 #include <esp_rom_sys.h>
+#include <esp_netif.h>
+#include <esp_wifi.h>
 #include "esphome/components/web_server_base/web_server_base.h"
 #include "esphome/components/wifi/wifi_component.h"
 #include "offline_rtc.h"
@@ -156,11 +158,64 @@ inline void wallbox_register_voltage_api() {
 
 inline bool wallbox_start_captive_portal() {
   auto *wifi = esphome::wifi::global_wifi_component;
-  if (wifi == nullptr) return false;
-  wifi->set_ap_timeout(1);
-  wifi->disable();
-  wifi->enable();
+  auto *portal = esphome::captive_portal::global_captive_portal;
+  if (wifi == nullptr || portal == nullptr || !wifi->has_ap()) return false;
+  if (portal->is_active()) return true;
+
+  const auto ap = wifi->get_ap();
+  const auto ssid = ap.get_ssid();
+  const auto password = ap.get_password();
+  wifi_mode_t mode = WIFI_MODE_NULL;
+  esp_err_t error = esp_wifi_get_mode(&mode);
+  if (error != ESP_OK) {
+    ESP_LOGE("setup", "Could not read WiFi mode: %s", esp_err_to_name(error));
+    return false;
+  }
+  if (mode != WIFI_MODE_AP && mode != WIFI_MODE_APSTA) {
+    error = esp_wifi_set_mode(mode == WIFI_MODE_NULL ? WIFI_MODE_AP : WIFI_MODE_APSTA);
+    if (error != ESP_OK) {
+      ESP_LOGE("setup", "Could not enable captive portal AP: %s", esp_err_to_name(error));
+      return false;
+    }
+  }
+
+  wifi_config_t config{};
+  if (ssid.size() > sizeof(config.ap.ssid) || password.size() > sizeof(config.ap.password)) {
+    ESP_LOGE("setup", "Configured captive portal AP credentials are too long");
+    return false;
+  }
+  memcpy(config.ap.ssid, ssid.c_str(), ssid.size());
+  memcpy(config.ap.password, password.c_str(), password.size());
+  config.ap.channel = ap.has_channel() ? ap.get_channel() : 1;
+  config.ap.ssid_hidden = ap.get_hidden();
+  config.ap.max_connection = 5;
+  config.ap.beacon_interval = 100;
+  config.ap.authmode = password.empty() ? WIFI_AUTH_OPEN : WIFI_AUTH_WPA2_PSK;
+  config.ap.pairwise_cipher = WIFI_CIPHER_TYPE_CCMP;
+
+  error = esp_wifi_set_config(WIFI_IF_AP, &config);
+  if (error != ESP_OK) {
+    ESP_LOGE("setup", "Could not configure captive portal AP: %s", esp_err_to_name(error));
+    return false;
+  }
+  portal->start();
+  char ip_buffer[esphome::network::IP_ADDRESS_BUFFER_SIZE];
+  ESP_LOGI("setup", "Captive portal AP started at %s", wifi->wifi_soft_ap_ip().str_to(ip_buffer));
   return true;
+}
+
+inline uint32_t wallbox_sample_period_minutes(const std::string &option) {
+  if (option == "1 minuta") return 1;
+  if (option == "15 minut") return 15;
+  if (option == "30 minut") return 30;
+  if (option == "1 h") return 60;
+  if (option == "2 h") return 120;
+  if (option == "4 h") return 240;
+  if (option == "6 h") return 360;
+  if (option == "12 h") return 720;
+  if (option == "24 h") return 1440;
+  ESP_LOGE("sampling", "Invalid sample interval option '%s'; using 1 h", option.c_str());
+  return 60;
 }
 
 inline bool wallbox_parse_mac(const std::string &value, uint64_t *address) {

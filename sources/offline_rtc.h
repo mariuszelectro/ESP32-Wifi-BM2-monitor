@@ -20,6 +20,7 @@
 #endif
 
 static constexpr uint32_t WALLBOX_RTC_MAGIC = 0x57424F5D;
+static constexpr uint32_t WALLBOX_BM2_AGE_MAGIC = 0x424D3241;
 static_assert(WALLBOX_RING_SAMPLES >= 3 && WALLBOX_RING_SAMPLES <= 65535, "ring size out of range");
 
 // Wartosci calkowite: napiecia w mV (div 1000), temperatura w setnych stopnia (div 100).
@@ -51,6 +52,29 @@ struct WallboxRtcState {
 
 RTC_NOINIT_ATTR WallboxRtcState wallbox_rtc_state;
 
+struct WallboxRtcBm2Age {
+  uint32_t magic;
+  uint32_t seconds;
+};
+
+RTC_NOINIT_ATTR WallboxRtcBm2Age wallbox_rtc_bm2_age;
+
+struct WallboxRtcBm2Stats {
+  uint32_t magic;
+  uint32_t attempts;
+  uint32_t successes;
+};
+
+static constexpr uint32_t WALLBOX_BM2_STATS_MAGIC = 0x424D3253;
+RTC_NOINIT_ATTR WallboxRtcBm2Stats wallbox_rtc_bm2_stats;
+
+inline void wallbox_rtc_bm2_age_initialize(bool keep_state) {
+  if (!keep_state || wallbox_rtc_bm2_age.magic != WALLBOX_BM2_AGE_MAGIC) {
+    wallbox_rtc_bm2_age.magic = WALLBOX_BM2_AGE_MAGIC;
+    wallbox_rtc_bm2_age.seconds = 0;
+  }
+}
+
 inline void wallbox_ring_reset(WallboxRing &ring) {
   memset(&ring, 0, sizeof(ring));
   ring.min_value = INT16_MAX;
@@ -58,6 +82,9 @@ inline void wallbox_ring_reset(WallboxRing &ring) {
 }
 
 inline void wallbox_rtc_initialize(bool keep_state) {
+  if (!keep_state || wallbox_rtc_bm2_stats.magic != WALLBOX_BM2_STATS_MAGIC) {
+    wallbox_rtc_bm2_stats = {WALLBOX_BM2_STATS_MAGIC, 0, 0};
+  }
   if (!keep_state || wallbox_rtc_state.magic != WALLBOX_RTC_MAGIC) {
     memset(&wallbox_rtc_state, 0, sizeof(wallbox_rtc_state));
     wallbox_rtc_state.magic = WALLBOX_RTC_MAGIC;
@@ -72,25 +99,30 @@ inline int16_t wallbox_to_int16(float scaled) {
   return static_cast<int16_t>(std::max<long>(INT16_MIN, std::min<long>(INT16_MAX, rounded)));
 }
 
-inline void wallbox_ring_push(WallboxRing &ring, int16_t value) {
+inline void wallbox_ring_push(WallboxRing &ring, int16_t value, bool positive_min_only = false) {
   ring.samples[ring.next] = value;
   ring.next = (ring.next + 1) % WALLBOX_RING_SAMPLES;
   if (ring.count < WALLBOX_RING_SAMPLES) ring.count++;
-  if (value < ring.min_value) ring.min_value = value;
+  if ((!positive_min_only || value > 0) && value < ring.min_value) ring.min_value = value;
   if (value > ring.max_value) ring.max_value = value;
   ring.last_value = value;
   ring.age_seconds = 0;
   ring.sequence++;
 }
 
-inline void wallbox_rtc_push_esp(float volts) { wallbox_ring_push(wallbox_rtc_state.esp, wallbox_to_int16(volts * 1000.0f)); }
-inline void wallbox_rtc_push_bm2(float volts) { wallbox_ring_push(wallbox_rtc_state.bm2, wallbox_to_int16(volts * 1000.0f)); }
+inline void wallbox_rtc_push_esp(float volts) { wallbox_ring_push(wallbox_rtc_state.esp, wallbox_to_int16(volts * 1000.0f), true); }
+inline void wallbox_rtc_push_bm2(float volts) {
+  wallbox_ring_push(wallbox_rtc_state.bm2, wallbox_to_int16(volts * 1000.0f), true);
+  wallbox_rtc_bm2_stats.attempts++;
+  if (volts > 0.0f) wallbox_rtc_bm2_stats.successes++;
+}
 inline void wallbox_rtc_push_temp(float celsius) { wallbox_ring_push(wallbox_rtc_state.temp, wallbox_to_int16(celsius * 100.0f)); }
 
 inline void wallbox_rtc_add_age(uint32_t seconds) {
   wallbox_rtc_state.esp.age_seconds += seconds;
   wallbox_rtc_state.bm2.age_seconds += seconds;
   wallbox_rtc_state.temp.age_seconds += seconds;
+  wallbox_rtc_bm2_age.seconds += seconds;
 }
 
 inline uint64_t wallbox_uptime_seconds(uint32_t millis_now) {
@@ -128,7 +160,8 @@ inline std::string wallbox_rtc_summary(int source) {
     out.append("{\"min\":null,\"max\":null,\"last\":null");
   } else {
     out.append("{\"min\":");
-    wallbox_append_scaled(out, ring->min_value, divisor);
+    if (ring->min_value == INT16_MAX) out.append("null");
+    else wallbox_append_scaled(out, ring->min_value, divisor);
     out.append(",\"max\":");
     wallbox_append_scaled(out, ring->max_value, divisor);
     out.append(",\"last\":");

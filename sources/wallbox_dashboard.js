@@ -7,6 +7,7 @@ panel.innerHTML = `
       <h1>Trend napięcia</h1>
       <p class="wallbox-summary" id="history-summary">Oczekiwanie na dane</p>
       <p class="wallbox-extrema" id="extrema-summary">Min / max po 1 min: oczekiwanie na próbkę</p>
+      <p class="wallbox-extrema" id="bm2-statistics">BM-2: oczekiwanie na statystykę odczytów</p>
     </div>
   </header>
   <div class="chart-toolbar">
@@ -40,6 +41,7 @@ const chart = panel.querySelector("#voltage-chart");
 const context = chart.getContext("2d");
 const summary = panel.querySelector("#history-summary");
 const extremaSummary = panel.querySelector("#extrema-summary");
+const bm2Statistics = panel.querySelector("#bm2-statistics");
 const devicesList = panel.querySelector("#devices-list");
 const devicesCount = panel.querySelector("#devices-count");
 let lastHistory = [];
@@ -81,8 +83,11 @@ function drawChart(values, extrema = lastExtrema, totalCount = values.length) {
     limits = { min: Math.floor(lo - pad), max: Math.ceil(hi + pad) };
   }
   const sourceExtrema = extrema;
+  const minLabel = sourceExtrema.min == null
+    ? "brak danych"
+    : `${Number(sourceExtrema.min).toFixed(info.decimals)} ${info.unit}`;
   extremaSummary.textContent = sourceExtrema && Number(sourceExtrema.count) > 0
-    ? `Min: ${Number(sourceExtrema.min).toFixed(info.decimals)} ${info.unit} · Max: ${Number(sourceExtrema.max).toFixed(info.decimals)} ${info.unit} · Ostatni odczyt: ${formatAge(sourceExtrema.age_s)}`
+    ? `Min: ${minLabel} · Max: ${Number(sourceExtrema.max).toFixed(info.decimals)} ${info.unit} · Ostatni odczyt: ${formatAge(sourceExtrema.age_s)}`
     : "Min / max / ostatni odczyt: oczekiwanie na próbkę";
 
   const { min, max } = limits;
@@ -167,7 +172,8 @@ function renderDevices(deviceValues) {
     name.textContent = device.name || (isBm2 ? "BM-2" : "Nazwa nieznana");
     const details = document.createElement("span");
     details.className = "device-details";
-    details.textContent = `${address} · pakiety: ${Number(device.packets) || 0} · ostatnio: ${formatAge(device.last_seen_s)}`;
+    const rssi = Number.isFinite(device.rssi) ? `${device.rssi} dBm` : "brak danych";
+    details.textContent = `${address} · RSSI: ${rssi} · pakiety: ${Number(device.packets) || 0} · ostatnio: ${formatAge(device.last_seen_s)}`;
     item.append(name, details);
     devicesList.append(item);
   }
@@ -183,6 +189,11 @@ async function refreshChart() {
     });
     if (!voltageResponse.ok) throw new Error(`HTTP ${voltageResponse.status}`);
     const voltageData = await voltageResponse.json();
+    const stats = voltageData.bm2_stats;
+    if (stats) {
+      const percent = stats.attempts > 0 ? ((stats.successes / stats.attempts) * 100).toFixed(1) : "0.0";
+      bm2Statistics.textContent = `BM-2: ${stats.successes} / ${stats.attempts} udanych odczytów (${percent}%) · pamięć RTC`;
+    }
     const sample = voltageData.summary || {};
     const plot = voltageData.plot || {};
     const divisor = Number(plot.div) || 1000;

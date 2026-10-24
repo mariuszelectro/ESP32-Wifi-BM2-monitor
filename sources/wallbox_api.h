@@ -8,8 +8,8 @@
 #include <freertos/semphr.h>
 #include <driver/gpio.h>
 #include <esp_rom_sys.h>
-
 #include "esphome/components/web_server_base/web_server_base.h"
+#include "esphome/components/wifi/wifi_component.h"
 #include "offline_rtc.h"
 
 struct WallboxBtDevice {
@@ -17,6 +17,7 @@ struct WallboxBtDevice {
   std::string name;
   uint32_t packet_count{0};
   uint32_t last_seen_ms{0};
+  int rssi{0};
 };
 
 inline std::vector<WallboxBtDevice> wallbox_bt_devices;
@@ -34,15 +35,16 @@ inline size_t wallbox_bt_devices_clear() {
   return count;
 }
 
-inline size_t wallbox_bt_device_observe(const std::string &address, const std::string &name, uint32_t now_ms) {
+inline size_t wallbox_bt_device_observe(const std::string &address, const std::string &name, uint32_t now_ms, int rssi) {
   if (wallbox_bt_devices_mutex != nullptr) xSemaphoreTake(wallbox_bt_devices_mutex, portMAX_DELAY);
   auto device = wallbox_bt_devices.begin();
   while (device != wallbox_bt_devices.end() && device->address != address) ++device;
   if (device == wallbox_bt_devices.end()) {
-    wallbox_bt_devices.push_back({address, name, 1, now_ms});
+    wallbox_bt_devices.push_back({address, name, 1, now_ms, rssi});
   } else {
     device->packet_count++;
     device->last_seen_ms = now_ms;
+    device->rssi = rssi;
     if (!name.empty()) device->name = name;
   }
   const size_t count = wallbox_bt_devices.size();
@@ -89,6 +91,8 @@ inline std::string wallbox_bt_devices_json() {
     wallbox_json_append_escaped(response, device.name);
     response.append("\",\"packets\":");
     response.append(std::to_string(device.packet_count));
+    response.append(",\"rssi\":");
+    response.append(std::to_string(device.rssi));
     response.append(",\"last_seen_s\":");
     response.append(std::to_string((millis() - device.last_seen_ms) / 1000U));
     response.push_back('}');
@@ -132,6 +136,11 @@ class WallboxVoltageApiHandler final : public AsyncWebHandler {
     response.append(summary);
     response.append(",\"plot\":");
     response.append(plot);
+    response.append(",\"bm2_stats\":{\"attempts\":");
+    response.append(std::to_string(wallbox_rtc_bm2_stats.attempts));
+    response.append(",\"successes\":");
+    response.append(std::to_string(wallbox_rtc_bm2_stats.successes));
+    response.push_back('}');
     response.push_back('}');
     request->send(200, "application/json", response.c_str());
   }
@@ -143,4 +152,26 @@ inline void wallbox_register_voltage_api() {
   if (registered || esphome::web_server_base::global_web_server_base == nullptr) return;
   esphome::web_server_base::global_web_server_base->add_handler(&handler);
   registered = true;
+}
+
+inline bool wallbox_start_captive_portal() {
+  auto *wifi = esphome::wifi::global_wifi_component;
+  if (wifi == nullptr) return false;
+  wifi->set_ap_timeout(1);
+  wifi->disable();
+  wifi->enable();
+  return true;
+}
+
+inline bool wallbox_parse_mac(const std::string &value, uint64_t *address) {
+  unsigned int bytes[6]{};
+  char trailing = 0;
+  if (sscanf(value.c_str(), "%2x:%2x:%2x:%2x:%2x:%2x%c", &bytes[0], &bytes[1], &bytes[2], &bytes[3], &bytes[4],
+             &bytes[5], &trailing) != 6) {
+    return false;
+  }
+  uint64_t parsed = 0;
+  for (const unsigned int byte : bytes) parsed = (parsed << 8) | byte;
+  *address = parsed;
+  return true;
 }

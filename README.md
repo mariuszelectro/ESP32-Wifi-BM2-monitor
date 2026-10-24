@@ -404,18 +404,12 @@ GPIO0
 GND
 ```
 
-ADC measurement accuracy can be calibrated by adjusting the voltage multiplier in the source code.
+ADC measurement accuracy can be calibrated by adjusting slider for valid value of voltage (in rduced range)
 
 Default calibration is located near:
 
 ```cpp
 yaml file (filtres)
-```
-
-around line:
-
-```text
-260
 ```
 
 Adjust the multiplier according to measurements performed with a calibrated multimeter.

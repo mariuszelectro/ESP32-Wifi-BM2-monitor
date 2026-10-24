@@ -80,12 +80,13 @@ Before compiling and flashing the firmware, the following values must be configu
 
 ## WiFi Settings
 
-Configure your WiFi credentials in Yaml file: section wifi
+Configure your default WiFi credentials in Yaml file: section wifi
 
 ```cpp
 ssid: "YOUR_WIFI_SSID";
 password: "YOUR_WIFI_PASSWORD";
 ```
+or use captive portal (3s long press user button)
 
 ## BM2 Bluetooth MAC Address
 
@@ -95,7 +96,7 @@ Configure the MAC address of your BM2 monitor: yaml file section ble_client:
 mac_addres: „xx:xx:xx:xx”
 ```
 
-Replace it with the address of your own BM2 device.
+Replace it with the address of your own BM2 device, or introduce directly in WEB easy
 
 The built-in BLE scanner can be used to discover nearby Bluetooth devices and determine the correct MAC address.
 
@@ -187,7 +188,7 @@ Supported interval range:
 Data history capacity:
 
 ```text
-200 measurements
+400 measurements
 ```
 
 ---
@@ -217,7 +218,7 @@ The Bluetooth connection remains active only for a few seconds, minimizing power
 The device stores:
 
 ```text
-200 historical measurements
+400 historical measurements
 ```
 
 Measurements are preserved in RTC memory and survive Deep Sleep wake-up cycles.
@@ -246,6 +247,7 @@ The integrated web interface provides:
 - Latest measurement
 - Event logs
 - Device diagnostics
+- BM2 connection status history
 
 All data is available locally through a standard web browser.
 
@@ -344,11 +346,11 @@ Required voltage divider:
 ```text
 VBUS
  |
-100K
+200K
  |
  +---- GPIO18
  |
-100K
+200K
  |
 GND
 ```
@@ -376,11 +378,11 @@ Required voltage divider:
 ```text
 Battery+
  |
-100K
+200K
  |
  +---- GPIO0
  |
-100K
+200K
  |
 GND
 ```
@@ -390,7 +392,7 @@ Filtering capacitor:
 ```text
 GPIO0
  |
-100nF
+47nF (NP0 recomended)
  |
 GND
 ```

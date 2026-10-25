@@ -58,6 +58,7 @@ The focus of the project is not real-time monitoring but long-term observation o
   <img src="Images/IMG_2623.jpeg" width="300">
   <img src="Images/IMG_2625.jpeg" width="300">
 </p>
+
 - Ultra low power Deep Sleep operation
 - Automatic VBUS detection
 - On-device diagnostics and event logging
@@ -66,6 +67,10 @@ The focus of the project is not real-time monitoring but long-term observation o
 - No MQTT required
 - No Internet connection required
 - NTFY notification and custom message with voltage value
+
+<p align="center">
+  <img src="Images/IMG_2629.jpeg" width="300">
+</p>
 
 ---
 

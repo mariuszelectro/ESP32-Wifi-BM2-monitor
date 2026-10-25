@@ -60,6 +60,7 @@ The focus of the project is not real-time monitoring but long-term observation o
 - No Home Assistant required
 - No MQTT required
 - No Internet connection required
+- NTFY notification and custom message with voltage value
 
 ---
 

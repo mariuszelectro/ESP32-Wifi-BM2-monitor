@@ -6,12 +6,29 @@
 #include <driver/gpio.h>
 #include <esp_sleep.h>
 #include <esp_private/esp_clk.h>
+#include <esp_rom_sys.h>
 
 #include "esphome/components/safe_mode/safe_mode.h"
 #include "esphome/core/preferences.h"
 #include "offline_rtc.h"
 
 static constexpr uint32_t WALLBOX_SLEEP_HOP_S = 10;
+RTC_DATA_ATTR bool wallbox_user_button_blocked = false;
+
+inline bool wallbox_user_button_short_press() {
+  if (gpio_get_level(GPIO_NUM_9) != 0) {
+    wallbox_user_button_blocked = false;
+    return false;
+  }
+  if (wallbox_user_button_blocked) return false;
+  // GPIO9 cannot wake C6 from deep sleep; measure only the press observed at a timer wake.
+  for (uint32_t elapsed_ms = 0; elapsed_ms < 3000; elapsed_ms++) {
+    esp_rom_delay_us(1000);
+    if (gpio_get_level(GPIO_NUM_9) != 0) return true;
+  }
+  wallbox_user_button_blocked = true;
+  return false;
+}
 
 // Splits a sleep of total_s seconds into hops; returns the first hop and stores the rest in RTC.
 inline uint32_t wallbox_plan_sleep(uint32_t total_s) {

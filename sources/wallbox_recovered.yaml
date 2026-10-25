@@ -1,3 +1,6 @@
+packages:
+  ntfy: !include packages/ntfy.yaml
+
 esphome:
   name: wallbox-esp
   friendly_name: "Wallbox ESP"
@@ -31,6 +34,16 @@ esphome:
             rtc.offline_elapsed_seconds += real_s;
             wallbox_rtc_add_age(real_s);
             rtc.hop_s = 0;
+            id(status_led).turn_on();
+            esp_rom_delay_us(${led_sleep_flash_ms} * 1000U);
+            const bool user_short_press = wallbox_user_button_short_press();
+            id(status_led).turn_off();
+            if (user_short_press) {
+              id(user_operational_override) = true;
+              id(user_override_started_ms) = millis();
+              rtc.wake_after_s = 0;
+              ESP_LOGI("power", "USER: operational override for 180 seconds");
+            }
             if (!kTestDeepSleep) {
               gpio_set_direction(static_cast<gpio_num_t>(${vbus_gpio_num}), GPIO_MODE_INPUT);
               const bool external = ${vbus_override_enabled} ? ${vbus_override_state}
@@ -41,10 +54,8 @@ esphome:
               }
             }
             if (rtc.wake_after_s > 0) {
-              id(status_led).turn_on();
-              esp_rom_delay_us(${led_sleep_flash_ms} * 1000U);
-              id(status_led).turn_off();
-              rtc.mark_us = wake_us;
+              rtc.uptime_base_us += esp_clk_rtc_time() - wake_us;
+              rtc.mark_us = esp_clk_rtc_time();
               wallbox_sleep_now(id(wallbox_safe_mode), wallbox_next_hop(), ${led_gpio_num});
             }
           }
@@ -63,7 +74,6 @@ esphome:
           wallbox_rtc_state.sample_pending = sample_due ? 1 : 0;
           wallbox_bt_devices_initialize();
           wallbox_bt_devices_clear();
-          id(bt_scan_results).publish_state("0");
           wallbox_register_voltage_api();
       - component.update: firmware_info
       - component.update: reset_info
@@ -106,7 +116,7 @@ logger:
   level: INFO
 
 wifi:
-  ssid: "Your SSID"
+  ssid: "Your SSId"
   password: "Your password"
   reboot_timeout: 0s
   power_save_mode: HIGH
@@ -135,6 +145,9 @@ web_server:
   port: 80
   version: 3
   sorting_groups:
+    - id: system_settings
+      name: "System i konserwacja"
+      sorting_weight: 90
     - id: power_calibration
       name: "Zasilanie i kalibracja"
       sorting_weight: 100
@@ -142,6 +155,14 @@ web_server:
   css_include: wallbox_dashboard.css
 
 globals:
+  - id: user_operational_override
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: user_override_started_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
   - id: last_bm2_rssi_ms
     type: uint32_t
     restore_value: no
@@ -218,7 +239,7 @@ binary_sensor:
   - platform: template
     id: vbus_override_active
     name: "VBUS override aktywny"
-    lambda: return ${vbus_override_enabled};
+    lambda: return ${vbus_override_enabled} || id(user_operational_override);
 
   - platform: template
     name: "Stycznik – stan"
@@ -261,8 +282,7 @@ esp32_ble_tracker:
             }
             if (!id(bt_scan_control).state) return;
             const std::string advertised_name = x.get_name();
-            const size_t device_count = wallbox_bt_device_observe(mac, advertised_name, millis(), x.get_rssi());
-            id(bt_scan_results).publish_state(std::to_string(device_count));
+            wallbox_bt_device_observe(mac, advertised_name, millis(), x.get_rssi());
 
 ble_client:
   - mac_address: "9C:1D:58:11:E7:86"
@@ -338,6 +358,8 @@ sensor:
       then:
         - lambda: |-
             if (!id(sample_record_pending) || !std::isfinite(x) || x <= 5.0f || x >= 30.0f) return;
+            if (id(bm2_ble_client).connected() && wallbox_ntfy_low_voltage(x))
+              id(ntfy_send).execute(x, false);
             wallbox_rtc_push_bm2(x);
             wallbox_rtc_bm2_age.seconds = 0;
             wallbox_rtc_state.sample_pending = 0;
@@ -383,6 +405,9 @@ text:
   - platform: template
     id: bm2_mac_input
     name: "Adres MAC BM2"
+    web_server:
+      sorting_group_id: system_settings
+      sorting_weight: 40
     mode: TEXT
     min_length: 17
     max_length: 17
@@ -395,6 +420,9 @@ select:
   - platform: template
     name: "Okres próbkowania napięcia"
     id: voltage_sample_interval_select
+    web_server:
+      sorting_group_id: system_settings
+      sorting_weight: 50
     options:
       - "1 minuta"
       - "15 minut"
@@ -411,19 +439,11 @@ select:
 
 text_sensor:
   - platform: template
-    name: "Statystyka odczytow BM2"
-    update_interval: 10s
-    lambda: |-
-      return std::to_string(wallbox_rtc_bm2_stats.successes) + " / " +
-             std::to_string(wallbox_rtc_bm2_stats.attempts) + " (udane / proby)";
-  - platform: template
-    id: bt_scan_results
-    name: "Bluetooth scan results"
-    icon: mdi:bluetooth-search
-    update_interval: never
-  - platform: template
     id: firmware_info
     name: "Kompilacja firmware"
+    web_server:
+      sorting_group_id: system_settings
+      sorting_weight: 10
     icon: mdi:calendar-clock
     update_interval: never
     lambda: return std::string(__DATE__) + " " + __TIME__;
@@ -464,6 +484,9 @@ switch:
   - platform: template
     name: "Tryb oszczędzania energii"
     id: energy_saving_mode
+    web_server:
+      sorting_group_id: system_settings
+      sorting_weight: 20
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
   - platform: template
@@ -476,7 +499,6 @@ switch:
       - lambda: |-
           if (!id(automatic_ble_cycle)) {
             wallbox_bt_devices_clear();
-            id(bt_scan_results).publish_state("0");
           }
       - esp32_ble_tracker.start_scan:
           continuous: true
@@ -503,6 +525,9 @@ button:
   - platform: restart
     name: "Restart ESP32"
     id: restart_esp32
+    web_server:
+      sorting_group_id: system_settings
+      sorting_weight: 30
     icon: mdi:restart
 
 interval:
@@ -511,6 +536,15 @@ interval:
       - lambda: |-
           constexpr bool kTestDeepSleep = ${test_deep_sleep};
           const uint32_t now = millis();
+          if (id(user_operational_override) &&
+              static_cast<uint32_t>(now - id(user_override_started_ms)) >= 180000U) {
+            id(user_operational_override) = false;
+            if (kTestDeepSleep) {
+              id(offline_ble_mode) = true;
+              id(offline_cycle_started_ms) = now - ${test_active_minutes} * 60000U;
+            }
+            ESP_LOGI("power", "USER: operational override expired");
+          }
           static std::string applied_bm2_mac = "9C:1D:58:11:E7:86";
           uint64_t configured_bm2_mac = 0;
           if (wallbox_parse_mac(id(bm2_mac_input).state, &configured_bm2_mac) &&
@@ -546,12 +580,13 @@ interval:
             id(external_power_mode) = vbus_high;
           }
 
-          if (kTestDeepSleep) {
+          if (kTestDeepSleep && !id(user_operational_override)) {
             if (!id(offline_ble_mode)) {
               id(offline_ble_mode) = true;
               id(offline_cycle_started_ms) = now;
             }
-            if (static_cast<uint32_t>(now - id(offline_cycle_started_ms)) >= ${test_active_minutes} * 60000U) {
+            if (static_cast<uint32_t>(now - id(offline_cycle_started_ms)) >= ${test_active_minutes} * 60000U &&
+                !id(ntfy_send).is_running()) {
               if (id(sample_record_pending)) {
                 wallbox_rtc_push_bm2(0.0f);
                 id(sample_record_pending) = false;
@@ -568,7 +603,7 @@ interval:
               rtc.mark_us = esp_clk_rtc_time();
               wallbox_sleep_now(id(wallbox_safe_mode), wallbox_plan_sleep(${test_sleep_minutes} * 60U), ${led_gpio_num});
             }
-          } else if (!id(energy_saving_mode).state || id(external_power_mode)) {
+          } else if (id(user_operational_override) || !id(energy_saving_mode).state || id(external_power_mode)) {
             if (id(external_power_mode)) wallbox_rtc_state.offline_elapsed_seconds = 0;
             bool force_sample = false;
             if (id(offline_ble_mode)) {
@@ -630,7 +665,8 @@ interval:
               }
             }
             const uint32_t active_window = id(offline_sample_pending) ? 45000 : 1000;
-            if (static_cast<uint32_t>(now - id(offline_cycle_started_ms)) >= active_window) {
+            if (static_cast<uint32_t>(now - id(offline_cycle_started_ms)) >= active_window &&
+                !id(ntfy_send).is_running()) {
               if (id(offline_sample_pending) && id(sample_record_pending)) {
                 wallbox_rtc_push_bm2(0.0f);
                 id(sample_record_pending) = false;
@@ -695,6 +731,8 @@ interval:
           static bool button_tracking = false;
           static bool button_action_done = false;
           static bool button_vbus_pin_configured = false;
+          static bool override_button_tracking = false;
+          static uint32_t override_button_pressed_ms = 0;
           const uint32_t now = millis();
           if (!button_vbus_pin_configured) {
             gpio_set_direction(static_cast<gpio_num_t>(${vbus_gpio_num}), GPIO_MODE_INPUT);
@@ -702,6 +740,26 @@ interval:
           }
           const bool raw_vbus = gpio_get_level(static_cast<gpio_num_t>(${vbus_gpio_num})) != 0;
           const bool vbus_present_now = ${vbus_override_enabled} ? ${vbus_override_state} : raw_vbus;
+          const bool pressed = gpio_get_level(GPIO_NUM_9) == 0;
+          const bool battery_sleep_mode = kTestDeepSleep || (id(energy_saving_mode).state && !vbus_present_now);
+          if (wallbox_user_button_blocked) {
+            if (!pressed) wallbox_user_button_blocked = false;
+            override_button_tracking = false;
+          } else if (battery_sleep_mode && pressed && !override_button_tracking) {
+            override_button_tracking = true;
+            override_button_pressed_ms = now;
+          } else if (override_button_tracking && pressed &&
+                     static_cast<uint32_t>(now - override_button_pressed_ms) > 1000U) {
+            wallbox_user_button_blocked = true;
+            override_button_tracking = false;
+          } else if (override_button_tracking && !pressed) {
+            if (battery_sleep_mode && static_cast<uint32_t>(now - override_button_pressed_ms) <= 1000U) {
+              id(user_operational_override) = true;
+              id(user_override_started_ms) = now;
+              ESP_LOGI("power", "USER: operational override for 180 seconds");
+            }
+            override_button_tracking = false;
+          }
           const bool button_operational = !kTestDeepSleep && vbus_present_now;
           const bool user_button_pressed = button_operational && gpio_get_level(GPIO_NUM_9) == 0;
           if (user_button_pressed) {

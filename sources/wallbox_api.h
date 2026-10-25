@@ -29,15 +29,13 @@ inline void wallbox_bt_devices_initialize() {
   if (wallbox_bt_devices_mutex == nullptr) wallbox_bt_devices_mutex = xSemaphoreCreateMutex();
 }
 
-inline size_t wallbox_bt_devices_clear() {
+inline void wallbox_bt_devices_clear() {
   if (wallbox_bt_devices_mutex != nullptr) xSemaphoreTake(wallbox_bt_devices_mutex, portMAX_DELAY);
   wallbox_bt_devices.clear();
-  const size_t count = wallbox_bt_devices.size();
   if (wallbox_bt_devices_mutex != nullptr) xSemaphoreGive(wallbox_bt_devices_mutex);
-  return count;
 }
 
-inline size_t wallbox_bt_device_observe(const std::string &address, const std::string &name, uint32_t now_ms, int rssi) {
+inline void wallbox_bt_device_observe(const std::string &address, const std::string &name, uint32_t now_ms, int rssi) {
   if (wallbox_bt_devices_mutex != nullptr) xSemaphoreTake(wallbox_bt_devices_mutex, portMAX_DELAY);
   auto device = wallbox_bt_devices.begin();
   while (device != wallbox_bt_devices.end() && device->address != address) ++device;
@@ -49,9 +47,7 @@ inline size_t wallbox_bt_device_observe(const std::string &address, const std::s
     device->rssi = rssi;
     if (!name.empty()) device->name = name;
   }
-  const size_t count = wallbox_bt_devices.size();
   if (wallbox_bt_devices_mutex != nullptr) xSemaphoreGive(wallbox_bt_devices_mutex);
-  return count;
 }
 
 inline void wallbox_json_append_escaped(std::string &output, const std::string &value) {

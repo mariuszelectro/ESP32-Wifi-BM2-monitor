@@ -55,8 +55,8 @@ The focus of the project is not real-time monitoring but long-term observation o
 - History graphs and statistics
   
  <p align="center">
-  <img src="Images/IMG_2623.jpeg" width="400">
-  <img src="Images/IMG_2625.jpeg" width="400">
+  <img src="Images/IMG_2623.jpeg" width="300">
+  <img src="Images/IMG_2625.jpeg" width="300">
 </p>
 - Ultra low power Deep Sleep operation
 - Automatic VBUS detection
@@ -411,6 +411,11 @@ GND
 ```
 
 ADC measurement accuracy can be calibrated by adjusting slider for valid value of voltage (in rduced range)
+<p align="center">
+  <img src="Images/IMG_2619.jpeg" width="300">
+  <img src="Images/IMG_2620.jpeg" width="300">
+  <img src="Images/IMG_2621.jpeg" width="300">
+</p>
 
 Default calibration is located near:
 

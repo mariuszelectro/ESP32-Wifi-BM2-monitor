@@ -53,6 +53,11 @@ The focus of the project is not real-time monitoring but long-term observation o
 - Built-in web server
 - RTC memory data logging
 - History graphs and statistics
+  
+ <p align="center">
+  <img src="Images/IMG_2623.jpeg" width="400">
+  <img src="Images/IMG_2625.jpeg" width="400">
+</p>
 - Ultra low power Deep Sleep operation
 - Automatic VBUS detection
 - On-device diagnostics and event logging

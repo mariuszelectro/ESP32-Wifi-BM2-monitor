@@ -1,0 +1,119 @@
+substitutions:
+  # 0 = dotychczasowy deep sleep; 1 = test: zachowany BLE + automatyczny light sleep.
+  mybm_light_sleep: "0"
+
+esphome:
+  name: mybm
+  friendly_name: MyBM
+  build_path: build\mybm-${mybm_light_sleep}
+  includes:
+    - mybm_model.h
+    - mybm_page.h
+    - mybm_runtime.h
+  platformio_options:
+    build_flags:
+      - -DESPHOME_ESP32_BLE_GAP_EVENT_HANDLER_COUNT=1
+      - -DMYBM_LIGHT_SLEEP=${mybm_light_sleep}
+  on_boot:
+    - priority: 700
+      then:
+        - lambda: |-
+            mybm::boot();
+            if (mybm::button_check_only) mybm::sleep_for_button_check();
+    - priority: -100
+      then:
+        - lambda: |-
+            mybm::initialize(id(mybm_ble));
+            if (mybm::initial_measurement_pending) {
+              const uint64_t measurement_started_us = mybm::timing_us();
+              id(mybm_adc).update();
+              id(mybm_temperature).update();
+              mybm::measure(id(mybm_adc).state, id(mybm_temperature).state);
+              mybm::record_measurement_time(measurement_started_us);
+            }
+            if (mybm::portal_active) {
+              id(mybm_wifi).enable();
+              esphome::web_server_base::global_web_server_base->init();
+            }
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_BOOTLOADER_SKIP_VALIDATE_IN_DEEP_SLEEP: "y"
+      CONFIG_BOOTLOADER_LOG_LEVEL_NONE: "y"
+      CONFIG_BT_LE_SLEEP_ENABLE: "y"
+      CONFIG_BT_LE_LP_CLK_SRC_DEFAULT: "y"
+      CONFIG_ESP_PHY_MAC_BB_PD: "y"
+      CONFIG_ESP_PHY_HW_SWITCH_RF: "y"
+      CONFIG_PM_ENABLE: "y"
+      CONFIG_FREERTOS_USE_TICKLESS_IDLE: "y"
+
+logger:
+  level: WARN
+  baud_rate: 0
+
+preferences:
+  flash_write_interval: 60s
+
+safe_mode:
+  id: mybm_safe_mode
+  disabled: true
+
+wifi:
+  id: mybm_wifi
+  enable_on_boot: false
+  reboot_timeout: 0s
+  ap:
+    ssid: MyBM
+    # Change before flashing; used only during the USER-activated portal.
+    password: "mybm-setup"
+    ap_timeout: 0s
+
+web_server_base:
+
+esp32_ble:
+  id: mybm_ble
+  enable_on_boot: false
+
+sensor:
+  - platform: adc
+    id: mybm_adc
+    pin: GPIO0
+    attenuation: 12db
+    samples: 16
+    sampling_mode: avg
+    update_interval: never
+    internal: true
+  - platform: internal_temperature
+    id: mybm_temperature
+    update_interval: never
+    internal: true
+
+interval:
+  - interval: 10ms
+    then:
+      - lambda: |-
+          if (mybm::measurement_due()) {
+            const uint64_t measurement_started_us = mybm::timing_us();
+            id(mybm_adc).update();
+            id(mybm_temperature).update();
+            mybm::measure(id(mybm_adc).state, id(mybm_temperature).state);
+            mybm::record_measurement_time(measurement_started_us);
+          }
+          mybm::tick();
+          if (mybm::wifi_enable_pending && mybm::radio_shutdown_confirmed()) {
+            id(mybm_wifi).enable();
+            esphome::web_server_base::global_web_server_base->init();
+            mybm::wifi_enable_pending = false;
+          }
+          if (mybm::wifi_disable_pending) {
+            id(mybm_wifi).disable();
+            mybm::wifi_disable_pending = false;
+          }
+          if (mybm::sleep_after_portal && id(mybm_wifi).is_disabled() &&
+              mybm::radio_shutdown_confirmed())
+            mybm::enter_deep_sleep_until(mybm::retained.next_radio_us);
+          mybm::wait_between_cycles();

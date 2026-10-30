@@ -226,9 +226,11 @@ Powrot do deep sleep:
 python -m esphome -s mybm_light_sleep 0 run mybm.yaml --device COM5 --no-logs
 ```
 
-Oba polecenia kompiluja przed wgraniem, aby nie pomylic ostatnio zbudowanego
-wariantu. Kazdy wariant ma osobny katalog budowania: `.esphome\build\mybm-0`
-oraz `.esphome\build\mybm-1` w katalogu projektu.
+Oba polecenia kompiluja przed wgraniem. Mozna tez ustawic `mybm_light_sleep`
+na `"0"` lub `"1"` w `mybm.yaml` i kompilowac zwyklym poleceniem bez `-s`.
+Oba tryby korzystaja z tego samego katalogu `.esphome\build\mybm` i nazwy
+`firmware.bin`; kolejna kompilacja zastepuje poprzedni wariant.
+Nie kompilowac obu trybow jednoczesnie w tym katalogu.
 Samo `upload` nie przebudowuje firmware. Nie wgrywac podczas
 testu automatycznie. Porownac prad spoczynkowy, energie calej serii i okres
 reklam przy tych samych ustawieniach; sprawdzic USER, portal i odbior reklamy
@@ -250,8 +252,7 @@ python -m esphome upload mybm\mybm.yaml --device COM5
 
 Zmien COM5 na port plytki. Pierwsze i kolejne wgrywanie przez USB;
 celowo nie dodano OTA, sieci domowej ani zewnetrznych uslug.
-Artefakty znajduja sie w `mybm\.esphome\build\mybm-0\.pioenvs\mybm`
-(deep sleep) lub `mybm\.esphome\build\mybm-1\.pioenvs\mybm` (light sleep).
+Artefakty obu trybow znajduja sie w `mybm\.esphome\build\mybm\.pioenvs\mybm`.
 Dotychczasowy projekt Wallbox nie jest modyfikowany.
 
 ## Weryfikacja

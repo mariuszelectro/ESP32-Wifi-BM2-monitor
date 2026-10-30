@@ -1,11 +1,11 @@
 substitutions:
   # 0 = dotychczasowy deep sleep; 1 = test: zachowany BLE + automatyczny light sleep.
-  mybm_light_sleep: "0"
+  mybm_light_sleep: "1"
 
 esphome:
   name: mybm
   friendly_name: MyBM
-  build_path: build\mybm-${mybm_light_sleep}
+  build_path: build\mybm
   includes:
     - mybm_model.h
     - mybm_page.h

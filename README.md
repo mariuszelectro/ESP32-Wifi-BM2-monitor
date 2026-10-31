@@ -346,7 +346,7 @@ Special thanks to Andrew Backway for reverse engineering the BM2 Bluetooth proto
 
 BM2 BLE component:
 
-https://github.com/andrewbackway/esphome-bm2\_ble
+https://github.com/andrewbackway/esphome-bm2_ble
 
 ---
 

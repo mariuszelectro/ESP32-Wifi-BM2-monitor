@@ -513,7 +513,7 @@ The USER button is connected to **GPIO4** through a **0 Ω resistor**, enabling:
 - Immediate voltage measurements
 - Quick access to diagnostics
 - Fast Captive Portal activation
-
+- Choice between internal or external antenna, with safe window time. 
 These enhancements improve usability, serviceability, and long-term monitoring capabilities while maintaining ultra-low power consumption.
 
 Using the onboard charging circuitry allows automatic charging whenever VBUS power is present.

@@ -1,4 +1,4 @@
-# ESP32 WiFi BM2 Monitor
+# ESP32 WiFi BM2/MyBM 12V car battery monitor
 
 ESP32 WiFi BM2 Monitor is a low-power autonomous battery monitoring system based on the Seeed Studio XIAO ESP32-C6, a BM2 Bluetooth Battery Monitor, and a Li-Ion 18650 backup battery.
 

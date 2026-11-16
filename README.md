@@ -289,7 +289,7 @@ Measured current consumption:
 Heartbeat LED:
 
 ```text
-5 ms pulse every 10 seconds
+2ms pulse every 10 seconds
 ```
 
 ### Active Mode
@@ -297,7 +297,7 @@ Heartbeat LED:
 Heartbeat LED:
 
 ```text
-30 ms pulse every 2 seconds
+30 ms pulse every 1 seconds
 ```
 
 ### Setup Mode
@@ -444,4 +444,77 @@ BAT+
 BAT-
 ```
 
+## What's New
+
+### Connectivity Improvements
+
+- BLE-triggered Captive Portal activation when external power (VBUS) is available, connected by any BLE scanner press ‚Connect’
+- Immediate wake-up using the USER button connected to **GPIO4** via a **0 Ω resistor**
+- Captive Portal can now be started instantly without waiting for the next scheduled wake-up cycle
+- Manual wake-up and configuration access are available even during battery-powered operation
+
+### BM2 and MyBM Support
+
+The monitor now supports both:
+
+- **BM2 Battery Monitor**
+- **MyBM Battery Monitor**. improve my own version hardvare version
+
+The desired monitor type can be selected directly from the web interface.
+
+### Scheduled Health Reports
+
+Automatic summary reports can be generated at user-defined intervals and times (e.g. every 24 hours, 2 days, or select).
+
+Reports include:
+
+- Vehicle battery voltage
+- Internal 18650 battery voltage
+- Min / Max / Average values
+- Battery discharge trends
+- Device statistics
+
+Reports can be delivered via **NTFY** notifications.
+
+### Battery Trend Analysis
+
+The system now calculates battery discharge trends between reports for:
+
+- Vehicle battery
+- Internal 18650 battery
+
+Trend data is displayed as both voltage and percentage change, making long-term battery health assessment easier.
+
+### Improved Data Visualization
+
+Historical graphs have been redesigned and now provide:
+
+- Trend lines
+- Min / Max markers
+- Average indicators
+- Adjustable time ranges
+- Improved readability
+
+### User Interface Enhancements
+
+The web interface has been reorganized to improve usability:
+
+- Cleaner dashboard layout
+- Simplified navigation
+- Improved mobile experience
+- Better diagnostics presentation
+- Enhanced event log readability
+
+### Hardware Improvements
+
+The USER button is connected to **GPIO4** through a **0 Ω resistor**, enabling:
+
+- Instant wake-up from Deep Sleep
+- Immediate voltage measurements
+- Quick access to diagnostics
+- Fast Captive Portal activation
+
+These enhancements improve usability, serviceability, and long-term monitoring capabilities while maintaining ultra-low power consumption.
+
 Using the onboard charging circuitry allows automatic charging whenever VBUS power is present.
+

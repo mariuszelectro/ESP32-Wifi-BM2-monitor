@@ -69,7 +69,7 @@ The focus of the project is not real-time monitoring but long-term observation o
 - NTFY notification and custom message with voltage value
 
 <p align="center">
-  <img src="Images/IMG_2629.jpeg" width="300">
+  <img src="Images/IMG_2684.jpeg" width="300">
 </p>
 
 ---
